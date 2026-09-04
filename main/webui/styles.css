@@ -158,7 +158,10 @@ h1, h2, h3 {
 
 .tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
+    align-items: center;
+    max-width: 100%;
 }
 
 .tab {
@@ -713,7 +716,20 @@ select option {
         align-items: flex-start;
     }
 
+    .tabs {
+        width: 100%;
+    }
+
+    .status-icons {
+        margin-left: 0;
+        flex: 1 1 100%;
+        justify-content: flex-end;
+        order: -1;
+    }
+
     .layout,
+    .layout.live-layout,
+    .layout.single,
     .form-grid {
         grid-template-columns: 1fr;
     }
@@ -728,8 +744,43 @@ select option {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .panel-head {
+        flex-wrap: wrap;
+    }
+
     .inline-form input {
         max-width: 100%;
+    }
+}
+
+/* Phone: stack dense grids; keep touch targets usable */
+@media (max-width: 520px) {
+    .wrap {
+        padding: 0.75rem;
+    }
+
+    .brand-logo {
+        width: 36px;
+        height: 36px;
+    }
+
+    .brand h1 {
+        font-size: 1.2rem;
+    }
+
+    .tab {
+        padding: 0.4rem 0.7rem;
+        font-size: 0.88rem;
+    }
+
+    .metrics,
+    .btn-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .panel {
+        padding: 0.85rem;
+        border-radius: 14px;
     }
 }
 
@@ -2237,5 +2288,25 @@ select option {
 
     .bay-head .overlay-label select {
         max-width: 100%;
+    }
+}
+
+@media (max-width: 520px) {
+    .charge-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .charge-body {
+        max-width: 100%;
+    }
+
+    .side-keypad,
+    .keypad-matrix {
+        max-width: 100%;
+    }
+
+    .target-charge-metrics,
+    .charge-weight-grid {
+        grid-template-columns: 1fr;
     }
 }

@@ -34,7 +34,8 @@ Local UI preview without flash:
 
 Scenario mocks: http://127.0.0.1:8094/samples.html
 
-Admin UI chrome: [docs/console-chrome.md](docs/console-chrome.md). Plan:
+Admin UI chrome: [docs/console-chrome.md](docs/console-chrome.md) (must work on
+phone / tablet / desktop — see Responsive section). Plan:
 [rooms/tfd/docs/ESP32-DYNAMITE-PLAN.md](../../../rooms/tfd/docs/ESP32-DYNAMITE-PLAN.md).
 
 Pin source is [tfd-old/Archive/dynamite/dynamite/dynamite.ino](../../../rooms/tfd-old/Archive/dynamite/dynamite/dynamite.ino), **not** RFID `archive/dynamite32`.
