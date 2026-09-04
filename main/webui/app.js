@@ -658,8 +658,14 @@
     let demoCache = scenarioState(getScenario());
     let demoOverrides = {};
     let pulseTimer = null;
+    let pulseUntil = 0;
+
+    function maglockPulseMs() {
+        return Math.min(400, Math.max(50, Number(demoConfig.maglockPulseMs) || 250));
+    }
 
     function currentState() {
+        expireMaglockPulse();
         const base = scenarioState(getScenario());
         Object.keys(demoOverrides).forEach((k) => {
             if (demoOverrides[k] !== undefined) {
@@ -694,8 +700,33 @@
         return data;
     }
 
+    function expireMaglockPulse() {
+        if (!pulseUntil) {
+            return;
+        }
+        if (Date.now() < pulseUntil) {
+            demoOverrides.maglock = 1;
+            return;
+        }
+        pulseUntil = 0;
+        demoOverrides.maglock = 0;
+        demoOverrides.pulseTimeoutFired = true;
+        demoOverrides.lastMqttIn = '{"magLock":0}';
+        if (pulseTimer) {
+            clearTimeout(pulseTimer);
+            pulseTimer = null;
+        }
+    }
+
+    function refreshLiveIfVisible() {
+        if (el("statusPills") || el("sendBay") || el("pulseLog")) {
+            setLive(currentState());
+        }
+    }
+
     function startDemoPulse() {
-        const ms = Math.min(400, demoConfig.maglockPulseMs || 250);
+        const ms = maglockPulseMs();
+        pulseUntil = Date.now() + ms;
         demoOverrides.maglock = 1;
         demoOverrides.lastPulseMs = ms;
         demoOverrides.pulseTimeoutFired = false;
@@ -704,11 +735,23 @@
             clearTimeout(pulseTimer);
         }
         pulseTimer = setTimeout(() => {
+            pulseUntil = 0;
             demoOverrides.maglock = 0;
             demoOverrides.pulseTimeoutFired = true;
             demoOverrides.lastMqttIn = '{"magLock":0}';
             pulseTimer = null;
+            refreshLiveIfVisible();
         }, ms);
+    }
+
+    function dropMaglock() {
+        pulseUntil = 0;
+        demoOverrides.maglock = 0;
+        demoOverrides.lastMqttIn = '{"magLock":0}';
+        if (pulseTimer) {
+            clearTimeout(pulseTimer);
+            pulseTimer = null;
+        }
     }
 
     function applyTargetPayload(payload) {
@@ -770,11 +813,10 @@
             return { ok: true, mock: true, persisted: true };
         }
         if (path === "/api/command") {
-            if (payload.magLock === 1 || cmd === "unlockCabinet") {
+            if (payload.magLock === 1 || cmd === "unlockCabinet" || cmd === "openDoor") {
                 startDemoPulse();
             } else if (payload.magLock === 0) {
-                demoOverrides.maglock = 0;
-                demoOverrides.pulseTimeoutFired = true;
+                dropMaglock();
             } else if (cmd === "reportState") {
                 demoOverrides.lastMqttOut = JSON.stringify({
                     id0: currentState().id0,
@@ -1186,11 +1228,13 @@
         }
         if (el("statusPills")) {
             const doorCls = state.doorOpen ? "pill-warn" : "pill-ok";
-            const magCls = state.maglock ? "pill-warn" : "";
             const storeCls = state.storagePresent ? "pill-ok" : "pill-bad";
+            const mag = state.maglock
+                ? `<span class="pill pill-warn">Maglock HIGH</span>`
+                : "";
             el("statusPills").innerHTML =
                 `<span class="pill ${doorCls}">Door ${state.doorOpen ? "OPEN" : "CLOSED"}</span>` +
-                `<span class="pill ${magCls}">Maglock ${state.maglock ? "HIGH" : "LOW"}</span>` +
+                mag +
                 `<span class="pill ${storeCls}">Storage ${state.storagePresent ? "present" : "missing"}</span>`;
         }
 
