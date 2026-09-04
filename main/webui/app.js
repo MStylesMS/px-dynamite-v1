@@ -6,6 +6,7 @@
     const KEY_MQTT = "px.dynamite.mqttCode";
     const KEY_MQTT_WEIGHT = "px.dynamite.mqttWeight";
     const KEY_WEIGHT = "px.dynamite.weightSetting";
+    const KEY_KEYHOLD = "px.dynamite.demo.keyhold.v1";
 
     const KEYPAD = [
         ["1", "2", "3", "A"],
@@ -358,8 +359,36 @@
         return KEYPAD.map((row) => row.map(() => false));
     }
 
-    function codeForSetting(setting) {
-        const hit = (demoConfig.codes || []).find((c) => c.label === setting);
+    function sanitizeKey(raw) {
+        const c = String(raw || "").trim().charAt(0);
+        if (!c) {
+            return "";
+        }
+        const up = c === "*" || c === "#" ? c : c.toUpperCase();
+        return /[0-9A-D*#]/.test(up) ? up : "";
+    }
+
+    function keyPos(k) {
+        for (let r = 0; r < KEYPAD.length; r++) {
+            const c = KEYPAD[r].indexOf(k);
+            if (c >= 0) {
+                return { r, c };
+            }
+        }
+        return null;
+    }
+
+    function isKeyDown(state, k) {
+        const pos = keyPos(k);
+        if (!pos || !state || !state.keypadDown) {
+            return false;
+        }
+        return Boolean(state.keypadDown[pos.r] && state.keypadDown[pos.r][pos.c]);
+    }
+
+    function codeForSetting(setting, codes) {
+        const list = codes || demoConfig.codes || [];
+        const hit = list.find((c) => c.label === setting);
         return hit && hit.code ? hit.code : "";
     }
 
@@ -377,15 +406,16 @@
     }
 
     function resolveTarget(state) {
+        const codes = (state && state.codes) || demoConfig.codes;
         const mqtt = sanitizeCode((state && state.mqttCode) || demoMqttCode);
         const setting = (state && state.gameSetting) || demoConfig.gameSetting;
         if (demoOverlay === "mqtt") {
             return mqtt;
         }
         if (demoOverlay) {
-            return codeForSetting(demoOverlay);
+            return codeForSetting(demoOverlay, codes);
         }
-        return codeForSetting(setting);
+        return codeForSetting(setting, codes);
     }
 
     function longestPrefixSuffix(seg, target) {
@@ -659,14 +689,62 @@
     let demoOverrides = {};
     let pulseTimer = null;
     let pulseUntil = 0;
+    let demoKeyHoldTimer = null;
+    let liveKeypressChain = Promise.resolve();
+    let lastLiveState = null;
+
+    function enrichLiveState(state) {
+        if (!state) {
+            return state;
+        }
+        const out = Object.assign({}, state);
+        if (!out.codes || !out.codes.length) {
+            out.codes = demoConfig.codes;
+        }
+        if (!out.targetWeights || !out.targetWeights.length) {
+            out.targetWeights = demoConfig.targetWeights;
+        }
+        out.gameMode = normalizeMode(out.gameMode || demoConfig.gameMode);
+        out.targetCode = resolveTarget(out);
+        return out;
+    }
 
     function maglockPulseMs() {
         return Math.min(400, Math.max(50, Number(demoConfig.maglockPulseMs) || 250));
     }
 
+    function applyPersistedKeyHold(base) {
+        try {
+            const raw = localStorage.getItem(KEY_KEYHOLD);
+            if (!raw) {
+                return;
+            }
+            const data = JSON.parse(raw);
+            if (!data || Date.now() > Number(data.until || 0)) {
+                localStorage.removeItem(KEY_KEYHOLD);
+                return;
+            }
+            if (demoOverrides.keypadDown == null && data.keypadDown) {
+                base.keypadDown = data.keypadDown;
+            }
+            if (demoOverrides.lastKey == null && data.lastKey) {
+                base.lastKey = data.lastKey;
+            }
+            if (demoOverrides.entryWindow == null && data.entryWindow != null) {
+                base.entryWindow = data.entryWindow;
+            }
+            if (demoOverrides.drivenRow == null && data.drivenRow != null) {
+                base.drivenRow = data.drivenRow;
+            }
+        } catch {
+            /* ignore */
+        }
+    }
+
     function currentState() {
         expireMaglockPulse();
         const base = scenarioState(getScenario());
+        applyPersistedKeyHold(base);
         Object.keys(demoOverrides).forEach((k) => {
             if (demoOverrides[k] !== undefined) {
                 base[k] = demoOverrides[k];
@@ -719,9 +797,50 @@
     }
 
     function refreshLiveIfVisible() {
-        if (el("statusPills") || el("sendBay") || el("pulseLog")) {
+        if (el("statusPills") || el("sendBay") || el("liveKeypad")) {
             setLive(currentState());
         }
+    }
+
+    function applyDemoKeypress(raw) {
+        const k = sanitizeKey(raw);
+        if (!k) {
+            return;
+        }
+        const prev = demoOverrides.entryWindow != null ? demoOverrides.entryWindow : currentState().entryWindow;
+        const down = emptyKeypad();
+        const pos = keyPos(k);
+        demoOverrides.lastKey = k;
+        demoOverrides.entryWindow = (String(prev || "") + k).slice(-10);
+        if (pos) {
+            down[pos.r][pos.c] = true;
+            demoOverrides.drivenRow = pos.r;
+        }
+        demoOverrides.keypadDown = down;
+        demoOverrides.lastMqttOut = JSON.stringify({ keypress: k });
+        try {
+            localStorage.setItem(KEY_KEYHOLD, JSON.stringify({
+                keypadDown: down,
+                lastKey: k,
+                entryWindow: demoOverrides.entryWindow,
+                drivenRow: demoOverrides.drivenRow,
+                until: Date.now() + 2500
+            }));
+        } catch {
+            /* ignore */
+        }
+        if (demoKeyHoldTimer) {
+            clearTimeout(demoKeyHoldTimer);
+        }
+        demoKeyHoldTimer = setTimeout(() => {
+            demoOverrides.keypadDown = emptyKeypad();
+            try {
+                localStorage.removeItem(KEY_KEYHOLD);
+            } catch {
+                /* ignore */
+            }
+            refreshLiveIfVisible();
+        }, 2500);
     }
 
     function startDemoPulse() {
@@ -831,10 +950,7 @@
             } else if (cmd === "setTarget" || payload.targetCode || payload.Code || payload.targetWeight != null) {
                 applyTargetPayload(payload);
             } else if (payload.keypress) {
-                const k = String(payload.keypress);
-                demoOverrides.lastKey = k;
-                const prev = demoOverrides.entryWindow != null ? demoOverrides.entryWindow : currentState().entryWindow;
-                demoOverrides.entryWindow = (String(prev || "") + k).slice(-10);
+                applyDemoKeypress(payload.keypress);
             }
             return { ok: true, mock: true, received: payload };
         }
@@ -1080,7 +1196,7 @@
         if (mqtt) {
             next.push({ value: "mqtt", text: "MQTT — " + mqtt });
         }
-        (state.codes || []).forEach((c) => {
+        (state.codes || demoConfig.codes || []).forEach((c) => {
             next.push({
                 value: c.label,
                 text: c.label + "-" + (c.code || "(empty)")
@@ -1152,6 +1268,8 @@
         if (!state) {
             return;
         }
+        state = enrichLiveState(state);
+        lastLiveState = state;
         const codeMode = state.gameMode === "code_entry";
         const badge = el("modeBadge");
         if (badge) {
@@ -1245,11 +1363,11 @@
                 rowKeys.forEach((k) => {
                     const b = document.createElement("button");
                     b.type = "button";
-                    b.className = "key" + (getDemoMode() ? " demo-key" : "");
+                    b.className = "key demo-key";
                     b.textContent = k;
                     b.dataset.key = k;
-                    if (getDemoMode()) {
-                        b.addEventListener("click", async () => {
+                    b.addEventListener("click", () => {
+                        liveKeypressChain = liveKeypressChain.then(async () => {
                             try {
                                 await api("/api/command", { method: "POST", body: JSON.stringify({ keypress: k }) });
                                 setLive(await api("/api/state"));
@@ -1257,7 +1375,7 @@
                                 /* ignore */
                             }
                         });
-                    }
+                    });
                     pads.appendChild(b);
                 });
             });
@@ -1265,6 +1383,7 @@
         if (pads) {
             Array.from(pads.querySelectorAll(".key")).forEach((b) => {
                 b.classList.toggle("last", b.dataset.key === state.lastKey);
+                b.classList.toggle("down", isKeyDown(state, b.dataset.key));
             });
         }
     }
@@ -1329,7 +1448,7 @@
             rowKeys.forEach((k, c) => {
                 const d = document.createElement("div");
                 const down = state.keypadDown && state.keypadDown[r] && state.keypadDown[r][c];
-                d.className = "kcell" + (state.drivenRow === r ? " driven" : "") + (down ? " low" : "");
+                d.className = "kcell" + (down ? " low" : "");
                 d.textContent = k;
                 box.appendChild(d);
             });
@@ -1531,7 +1650,7 @@
                     demoConfig.gameSetting = demoOverlay;
                     saveDemoConfig(demoConfig);
                 }
-                setLive(currentState());
+                setLive(lastLiveState || currentState());
             });
         }
         const wsel = el("targetWeightSelect");
@@ -1543,7 +1662,7 @@
                     demoConfig.weightSetting = demoWeightSetting;
                     saveDemoConfig(demoConfig);
                 }
-                setLive(currentState());
+                setLive(lastLiveState || currentState());
             });
         }
 
@@ -1604,7 +1723,7 @@
         fetchStatusIcons();
         setInterval(fetchStatusIcons, 10000);
         refresh();
-        setInterval(() => refresh().catch(() => {}), 2000);
+        setInterval(() => refresh().catch(() => {}), 400);
     }
 
     async function pageConfig() {

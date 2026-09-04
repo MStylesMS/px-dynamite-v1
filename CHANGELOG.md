@@ -4,6 +4,30 @@ All notable changes to px-dynamite-v1 are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Version numbers correspond to the contents of `version.txt`.
 
+## [0.06] - 2026-09-04
+
+### Fixed
+
+- Live Target code dropdown was empty on the ESP: `/api/state` omitted the
+  configured codes, and the UI did not fall back to `/api/config`.
+
+## [0.05] - 2026-09-04
+
+### Added
+
+- Live keypad `{keypress}` inject and Monitor held-key highlight, shipped
+  to the spare at `.57`.
+
+## [0.04] - 2026-09-04
+
+### Added
+
+- Live keypad clicks inject `{keypress}` the same way as the physical pad
+  (entry window, MQTT, last key).
+- Monitor lights the key that is currently held, including UI-injected
+  presses (held ~2 s so the poll can see them). The keypad no longer
+  outlines the scan row — that ring flickered too fast to read.
+
 ## [0.03] - 2026-09-04
 
 ### Fixed

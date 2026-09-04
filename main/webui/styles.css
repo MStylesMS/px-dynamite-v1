@@ -2046,10 +2046,11 @@ select option {
     background: rgba(8, 20, 44, 0.55);
     color: var(--ink);
     font-weight: 800;
-    cursor: default;
+    cursor: pointer;
 }
 
-.key.last {
+.key.last,
+.key.down {
     background: var(--cta);
     color: var(--ok-ink);
     border-color: transparent;
@@ -2247,10 +2248,6 @@ select option {
     justify-content: center;
     font-weight: 800;
     background: rgba(8, 20, 44, 0.4);
-}
-
-.kcell.driven {
-    box-shadow: 0 0 0 2px #f0a92a;
 }
 
 .kcell.low {

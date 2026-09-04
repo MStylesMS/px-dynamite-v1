@@ -4,8 +4,9 @@ TFD control-room dynamite cabinet firmware for Paradox escape rooms.
 
 ## Status
 
-Firmware **0.03** on the USB spare (`COM6`, MAC `24:0a:c4:c1:25:00`). I/O only:
+Firmware **0.06** on the USB spare (`192.168.8.57`, MAC `24:0a:c4:c1:25:00`). I/O only:
 reeds, pressure, keypad, maglock pulse, door. Win stays in `control.js`.
+Live keypad clicks POST `{keypress}` so they match a physical press.
 
 Trailer cabinet is still **192.168.8.53** (`24:0a:c4:1d:35:cc`) on Arduino
 ParadoxProp — HTTP `POST /ota` rejects the IDF image. The spare took serial
@@ -44,7 +45,7 @@ Pin source is [tfd-old/Archive/dynamite/dynamite/dynamite.ino](../../../rooms/tf
 
 | Topic | Payload |
 |-------|---------|
-| `/Paradox/ParadoxDynamiteProp/command` | `{magLock:0\|1}`, `reportState` |
+| `/Paradox/ParadoxDynamiteProp/command` | `{magLock:0\|1}`, `{keypress}`, `reportState` |
 | `/Paradox/ParadoxDynamiteProp/state` | `{keypress}`, `{id0..id3, allConnected, doorOpen}` |
 | `/Paradox/Props` | heartbeat id `Dynamite32Prop` |
 | `/Paradox/ParadoxDynamiteProp/Props` | same, for the GM lamp |

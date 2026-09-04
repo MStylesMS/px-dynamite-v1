@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PX-Dynamite-V1 Monitor</title>
-    <link rel="stylesheet" href="styles.css?v=dyn9">
+    <link rel="stylesheet" href="styles.css?v=dyn12">
 </head>
 <body>
     <div class="bg-grid" aria-hidden="true"></div>
@@ -51,7 +51,7 @@
             <div class="panel-head">
                 <h2>Keypad matrix (Bank1 0–7)</h2>
             </div>
-            <p class="hint">Rows 0–3 driven LOW to scan. Columns 4–7 INPUT_PULLUP, LOW = pressed. Amber ring = currently driven row.</p>
+            <p class="hint">Rows 0–3 driven LOW to scan. Columns 4–7 INPUT_PULLUP, LOW = pressed. Green cell = key currently held (physical or Live click).</p>
             <div class="keypad-matrix" id="keypadMatrix"></div>
         </section>
 
@@ -66,7 +66,7 @@
         <pre id="monitorLog" class="log hidden"></pre>
     </main>
 
-    <script src="app.js?v=dyn8"></script>
+    <script src="app.js?v=dyn12"></script>
     <script>
         (function boot(attempt) {
             if (window.PX && typeof window.PX.pageMonitor === "function") {

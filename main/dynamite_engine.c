@@ -27,6 +27,7 @@ static const char *TAG = "Dynamite32Prop";
 #define PRESSURE_PIN 8
 #define CODE_SET_COUNT 8
 #define CODE_MAX 16
+#define VIRTUAL_KEY_HOLD_MS 2500
 
 static const int k_rows[4] = {0, 1, 2, 3};
 static const int k_cols[4] = {4, 5, 6, 7};
@@ -85,6 +86,8 @@ typedef struct {
     bool keys_down[16];
     int key_stable[16];
     int driven_row;
+    int virtual_key_idx;
+    int64_t virtual_key_until_ms;
     bool spi_ok;
     char mqtt_last_in[96];
     int64_t mqtt_last_in_ts_ms;
@@ -344,12 +347,82 @@ static void append_entry_unlocked(const char *key)
     s_ctx.entry_window[len + 1] = '\0';
 }
 
+static int key_index_for(const char *key)
+{
+    int i;
+    if (!key || !key[0]) {
+        return -1;
+    }
+    for (i = 0; i < 16; ++i) {
+        if (k_keys[i][0] == key[0] && k_keys[i][1] == '\0') {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static bool sanitize_keypress(const char *in, char *out, size_t out_size)
+{
+    char c;
+    if (!in || !out || out_size < 2) {
+        return false;
+    }
+    c = in[0];
+    if (c >= 'a' && c <= 'd') {
+        c = (char)(c - 'a' + 'A');
+    }
+    if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'D') || c == '*' || c == '#') {
+        out[0] = c;
+        out[1] = '\0';
+        return true;
+    }
+    return false;
+}
+
+static void expire_virtual_key_unlocked(void)
+{
+    if (s_ctx.virtual_key_idx < 0) {
+        return;
+    }
+    if (now_ms() < s_ctx.virtual_key_until_ms) {
+        return;
+    }
+    s_ctx.keys_down[s_ctx.virtual_key_idx] = false;
+    s_ctx.virtual_key_idx = -1;
+    s_ctx.virtual_key_until_ms = 0;
+}
+
+static bool virtual_key_holds_idx(int idx)
+{
+    return s_ctx.virtual_key_idx == idx && now_ms() < s_ctx.virtual_key_until_ms;
+}
+
+static void apply_virtual_key_unlocked(const char *key)
+{
+    int idx = key_index_for(key);
+    if (idx < 0) {
+        return;
+    }
+    if (s_ctx.virtual_key_idx >= 0 && s_ctx.virtual_key_idx != idx) {
+        s_ctx.keys_down[s_ctx.virtual_key_idx] = false;
+    }
+    s_ctx.virtual_key_idx = idx;
+    s_ctx.virtual_key_until_ms = now_ms() + VIRTUAL_KEY_HOLD_MS;
+    s_ctx.keys_down[idx] = true;
+    s_ctx.driven_row = idx / 4;
+    copy_bounded(s_ctx.last_key, sizeof(s_ctx.last_key), k_keys[idx]);
+    append_entry_unlocked(k_keys[idx]);
+    publish_keypress_unlocked(k_keys[idx]);
+}
+
 static void scan_keypad_row_unlocked(int row)
 {
     int col;
     int debounce = clamp_int(s_ctx.cfg.keypad_debounce, 1, 20);
 
-    s_ctx.driven_row = row;
+    if (s_ctx.virtual_key_idx < 0) {
+        s_ctx.driven_row = row;
+    }
     mcp23s17_digital_write(k_rows[row], 0);
     {
         TickType_t hold = pdMS_TO_TICKS(clamp_int(s_ctx.cfg.keypad_scan_ms, 1, 50));
@@ -357,7 +430,11 @@ static void scan_keypad_row_unlocked(int row)
     }
     for (col = 0; col < 4; ++col) {
         int idx = row * 4 + col;
-        bool down = mcp23s17_digital_read(k_cols[col]) == 0;
+        bool down;
+        if (virtual_key_holds_idx(idx)) {
+            continue;
+        }
+        down = mcp23s17_digital_read(k_cols[col]) == 0;
         if (down) {
             if (s_ctx.key_stable[idx] < debounce) {
                 s_ctx.key_stable[idx]++;
@@ -393,6 +470,7 @@ static void dyn_loop_task(void *arg)
     while (true) {
         if (dyn_lock()) {
             expire_maglock_unlocked();
+            expire_virtual_key_unlocked();
             if (s_ctx.spi_ok) {
                 scan_reeds_unlocked();
                 scan_pressure_unlocked();
@@ -680,6 +758,7 @@ esp_err_t dynamite_engine_init(void)
     };
 
     memset(&s_ctx, 0, sizeof(s_ctx));
+    s_ctx.virtual_key_idx = -1;
     s_ctx.lock = xSemaphoreCreateMutex();
     if (!s_ctx.lock) {
         return ESP_ERR_NO_MEM;
@@ -861,7 +940,26 @@ void dynamite_engine_get_state_json(char *out, size_t out_size)
             pos = json_append(out, out_size, pos, "]");
         }
     }
-    (void)json_append(out, out_size, pos, "]}");
+    pos = json_append(out, out_size, pos, "],\"codes\":[");
+    for (i = 0; i < CODE_SET_COUNT; ++i) {
+        char esc[48];
+        lib_json_escape_string(s_ctx.cfg.codes[i].code, esc, sizeof(esc));
+        pos = json_append(out, out_size, pos, "%s{\"label\":\"%s\",\"code\":\"%s\"}",
+                          i ? "," : "", s_ctx.cfg.codes[i].label, esc);
+    }
+    {
+        char esc_target[48];
+        const char *target_code = "";
+        for (i = 0; i < CODE_SET_COUNT; ++i) {
+            if (s_ctx.cfg.codes[i].label[0] &&
+                s_ctx.cfg.codes[i].label[0] == s_ctx.cfg.game_setting[0]) {
+                target_code = s_ctx.cfg.codes[i].code;
+                break;
+            }
+        }
+        lib_json_escape_string(target_code, esc_target, sizeof(esc_target));
+        (void)json_append(out, out_size, pos, "],\"targetCode\":\"%s\"}", esc_target);
+    }
     dyn_unlock();
 }
 
@@ -892,6 +990,8 @@ esp_err_t dynamite_engine_handle_command_json(const char *json, char *response, 
 {
     cJSON *root;
     char command[32] = "";
+    char keypress_raw[8] = "";
+    char keypress[4] = "";
     int maglock = -1;
 
     if (!json || !response || response_size < 8) {
@@ -917,6 +1017,9 @@ esp_err_t dynamite_engine_handle_command_json(const char *json, char *response, 
         if (command[0] == '\0') {
             (void)lib_json_get_string(root, "Command", command, sizeof(command));
         }
+        if (!lib_json_get_string(root, "keypress", keypress_raw, sizeof(keypress_raw))) {
+            (void)lib_json_get_string(root, "Keypress", keypress_raw, sizeof(keypress_raw));
+        }
         cJSON_Delete(root);
     }
 
@@ -937,6 +1040,12 @@ esp_err_t dynamite_engine_handle_command_json(const char *json, char *response, 
     if (strcmp(command, "reportState") == 0) {
         publish_status_unlocked();
         snprintf(response, response_size, "{\"ok\":true,\"command\":\"reportState\"}");
+        dyn_unlock();
+        return ESP_OK;
+    }
+    if (sanitize_keypress(keypress_raw, keypress, sizeof(keypress))) {
+        apply_virtual_key_unlocked(keypress);
+        snprintf(response, response_size, "{\"ok\":true,\"keypress\":\"%s\"}", keypress);
         dyn_unlock();
         return ESP_OK;
     }
