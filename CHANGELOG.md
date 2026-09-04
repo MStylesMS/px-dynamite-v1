@@ -16,7 +16,7 @@ Version numbers correspond to the contents of `version.txt`.
 ### Added
 
 - Live keypad `{keypress}` inject and Monitor held-key highlight, shipped
-  to the spare at `.57`.
+  to the live replacement at `.57` (`dynamite.local`).
 
 ## [0.04] - 2026-09-04
 
