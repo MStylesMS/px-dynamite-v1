@@ -2,12 +2,12 @@
 
 ESP32 dynamite-cabinet firmware — Paradox TFD control room.
 
-## Status (2026-09-03)
+## Status (2026-09-04)
 
-UI prototype **0.01**. No firmware flashed. Crafty Fox wiring is **reed SPI**
-(2× MCP23S17, keypad, maglock GPIO 23) — **not** the RFID `dynamite32` tree.
+Firmware **0.02**. Crafty Fox wiring is **reed SPI** (2× MCP23S17, keypad,
+maglock GPIO 23) — **not** the RFID `dynamite32` tree.
 
-The ESP will be I/O only: report `{keypress}` / `{allConnected, id0..id3,
+The ESP is I/O only: report `{keypress}` / `{allConnected, id0..id3,
 doorOpen}`, pulse maglock. Keypad codes and win stay in `control.js`.
 
 ## License
@@ -39,7 +39,17 @@ px-valve-v1 (8092), or px-patch-v1 (8093).
 
 ## Firmware
 
-Pin ESP-IDF 6.0.x, `idf.py set-target esp32`, `EXTRA_COMPONENT_DIRS` →
-`../px-components` when the firmware tree is added. See
+Build: `idf.py set-target esp32` then `idf.py build` (ESP-IDF 6.0.x).
+Artifact: `build/px-dynamite-v1.bin`.
+
+OTA:
+
+```powershell
+.\scripts\ota_upload.ps1 -HostAddress <ip>          # new /api/ota/upload
+.\scripts\ota_upload.ps1 -HostAddress <ip> -Legacy  # old POST /ota
+```
+
+Default STA `Paradox-TFD-1` / `tfd1-jr6t`, broker `192.168.8.132`.
+Pin ESP-IDF 6.0.x, `EXTRA_COMPONENT_DIRS` → `../px-components`. See
 [docs/console-chrome.md](docs/console-chrome.md) and
 [rooms/tfd/docs/ESP32-DYNAMITE-PLAN.md](../../rooms/tfd/docs/ESP32-DYNAMITE-PLAN.md).

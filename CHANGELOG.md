@@ -4,6 +4,25 @@ All notable changes to px-dynamite-v1 are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Version numbers correspond to the contents of `version.txt`.
 
+## [0.03] - 2026-09-04
+
+### Fixed
+
+- Boot loop when the reed MCP23S17 is absent: 8 KB config buffers no longer
+  sit on the 8 KB `main` stack. Main stack raised to 16 KB.
+- `dyn_loop` now delays at least one RTOS tick so a missing expander cannot
+  starve IDLE0 / the task watchdog.
+
+## [0.02] - 2026-09-04
+
+### Added
+
+- ESP-IDF firmware for classic esp32: dual MCP23S17 reed/keypad scan, maglock
+  pulse on GPIO 23 with a hard 400 ms cap, door on GPIO 33.
+- MQTT `/Paradox/ParadoxDynamiteProp/{command,state}` plus dual heartbeat
+  (`/Paradox/Props` and `.../Props`) as `Dynamite32Prop`.
+- HTTP OTA (`POST /api/ota/upload`) and Signal Glass console served from flash.
+
 ## [0.01] - 2026-09-04
 
 ### Added

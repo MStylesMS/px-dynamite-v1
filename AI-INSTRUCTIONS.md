@@ -4,18 +4,25 @@ TFD control-room dynamite cabinet firmware for Paradox escape rooms.
 
 ## Status
 
-UI prototype **0.01**. No firmware on the trailer yet. Crafty Fox is **reed
-SPI / no RFID**. I/O only: reeds, pressure, keypad, maglock pulse, door.
-Win (all charges present + `*`) stays in `control.js`.
+Firmware **0.03** on the USB spare (`COM6`, MAC `24:0a:c4:c1:25:00`). I/O only:
+reeds, pressure, keypad, maglock pulse, door. Win stays in `control.js`.
 
-## Firmware (when implemented)
+Trailer cabinet is still **192.168.8.53** (`24:0a:c4:1d:35:cc`) on Arduino
+ParadoxProp — HTTP `POST /ota` rejects the IDF image. The spare took serial
+flash and joined `Paradox-TFD-1` as **192.168.8.57** (weak RSSI, `spiOk` false
+until it is on the reed board).
+
+## Firmware
 
 - Target: classic **esp32**, IDF **6.0.x**, flash **4MB**, version from `version.txt`.
-- Default STA: `Paradox-TFD-1`; broker **`192.168.8.132`**.
+- Artifact: `build/px-dynamite-v1.bin` (OTA payload).
+- Default STA: `Paradox-TFD-1` / `tfd1-jr6t`; broker **`192.168.8.132`**.
+- OTA: browser `update.html`, or
+  `.\scripts\ota_upload.ps1 -HostAddress <ip>` (new `/api/ota/upload`),
+  `.\scripts\ota_upload.ps1 -HostAddress <ip> -Legacy` (old ParadoxProp `POST /ota`).
 - SoftAP SSID form: `Paradox-PXDynamiteV1-XXXX`.
 - **I/O only.** Do not put safe codes or `success()` on the ESP.
-- **Do not trailer-flash until a human asks.** Bring the unit onto `.132`
-  Wi-Fi first.
+- Maglock GPIO 23 is a **short self-timed pulse** (default 250 ms, hard cap 400 ms).
 
 Local UI preview without flash:
 
