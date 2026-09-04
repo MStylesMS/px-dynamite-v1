@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PX-Dynamite-V1 Console</title>
+    <link rel="stylesheet" href="styles.css?v=dyn7">
+</head>
+<body>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <header class="topbar wrap">
+        <div class="brand">
+            <img src="assets/logo.png" alt="Logo" class="brand-logo" loading="lazy" decoding="async" onerror="this.style.display='none'">
+            <div>
+                <p class="kicker">Paradox Prop Console</p>
+                <h1>PX-Dynamite-V1 Live</h1>
+            </div>
+        </div>
+        <nav class="tabs">
+            <a class="tab active" href="index.html">Live</a>
+            <a class="tab" href="config.html">Config</a>
+            <a class="tab" href="monitor.html">Monitor</a>
+            <a class="tab" href="connection.html">Connect</a>
+            <div class="status-icons" id="statusIcons"></div>
+        </nav>
+    </header>
+
+    <main class="wrap layout live-layout">
+        <section class="panel pulse" id="gameStatePanel">
+            <div class="panel-head">
+                <h2>Dynamite Cabinet</h2>
+                <div class="mode-row">
+                    <span id="modeBadge" class="badge">loading</span>
+                    <label class="overlay-label code-select-wrap hidden" id="codeSelectWrap">Target
+                        <select id="targetCodeSelect"></select>
+                    </label>
+                </div>
+            </div>
+            <p class="hint" id="modeHint">Basic I/O reports reeds / keypad / maglock. Code Entry matches a target on the rolling window — still display-only in this prototype.</p>
+
+            <div class="cabinet-split">
+                <div class="bays">
+                    <div class="bay target-charge-bay">
+                        <div class="bay-head">
+                            <h3>Target Charge</h3>
+                            <label class="overlay-label">
+                                <select id="targetWeightSelect" aria-label="Target charge"></select>
+                            </label>
+                        </div>
+                        <div class="target-charge-metrics">
+                            <div class="weight-metric">
+                                <span>Target</span>
+                                <strong id="targetWeightReadout">—</strong>
+                            </div>
+                            <div class="weight-metric">
+                                <span>Current</span>
+                                <strong id="currentWeightReadout">—</strong>
+                            </div>
+                        </div>
+                        <p class="hint" id="targetChargeList"></p>
+                    </div>
+                    <div class="bay">
+                        <h3>Send Bay</h3>
+                        <div class="charge-row" id="sendBay"></div>
+                    </div>
+                    <div class="bay">
+                        <h3>Storage Bay</h3>
+                        <div class="charge-row" id="storageBay"></div>
+                    </div>
+                </div>
+
+                <div class="code-side">
+                    <div class="code-window" id="targetWindowWrap">
+                        <span>Target Code</span>
+                        <div class="code-readout" id="targetReadout">—</div>
+                    </div>
+                    <div class="code-window">
+                        <span>Code Entry</span>
+                        <div class="entry-strip" id="entryStrip" aria-label="Rolling keypad window"></div>
+                    </div>
+                    <div class="side-keypad" id="liveKeypad" aria-label="Cabinet keypad"></div>
+                    <div class="door-block">
+                        <h3>Cabinet Door</h3>
+                        <div class="door-draw" id="doorDraw" aria-label="Cabinet door"></div>
+                        <p class="door-state" id="doorState">CLOSED</p>
+                        <button class="btn btn-start" id="openCabinetBtn" data-cmd='{"magLock":1}'>Open Cabinet</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <h2>Quick Actions</h2>
+                <button id="refreshBtn" class="btn btn-ghost">Refresh</button>
+            </div>
+            <div class="status-pills" id="statusPills"></div>
+            <div class="btn-grid">
+                <button class="btn btn-start" data-cmd='{"magLock":1}'>Open Cabinet</button>
+                <button class="btn" data-cmd='{"command":"reportState"}'>Report State</button>
+                <button class="btn btn-ghost" data-cmd='{"doorOpen":true}'>Door Open</button>
+                <button class="btn btn-ghost" data-cmd='{"doorOpen":false}'>Door Closed</button>
+            </div>
+            <p class="hint">Door Open / Closed previews the latch graphic. GPIO 33 can be wired later if the sensor is missing. Report State publishes <code>id0..id3</code>.</p>
+            <pre id="actionLog" class="log"></pre>
+        </section>
+    </main>
+
+    <script src="app.js?v=dyn7"></script>
+    <script>
+        (function boot(attempt) {
+            if (window.PX && typeof window.PX.pageDashboard === "function") {
+                window.PX.pageDashboard();
+                return;
+            }
+            if (attempt >= 6) {
+                var log = document.getElementById("actionLog");
+                if (log) log.textContent = "Failed to load app.js after retries. Hard-refresh the page.";
+                return;
+            }
+            var s = document.createElement("script");
+            s.src = "app.js?r=" + Date.now() + "-" + attempt;
+            s.onload = function () { boot(attempt + 1); };
+            s.onerror = function () { setTimeout(function () { boot(attempt + 1); }, 200 * (attempt + 1)); };
+            document.head.appendChild(s);
+        })(0);
+    </script>
+</body>
+</html>

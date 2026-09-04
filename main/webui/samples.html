@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PX-Dynamite-V1 UI samples</title>
+    <link rel="stylesheet" href="styles.css?v=dyn7">
+</head>
+<body>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <header class="topbar wrap">
+        <div class="brand">
+            <img src="assets/logo.png" alt="Logo" class="brand-logo" loading="lazy" decoding="async" onerror="this.style.display='none'">
+            <div>
+                <p class="kicker">Paradox Prop Console</p>
+                <h1>Dynamite UI samples</h1>
+            </div>
+        </div>
+        <nav class="tabs">
+            <a class="tab" href="index.html">Live</a>
+            <a class="tab" href="config.html">Config</a>
+            <a class="tab" href="monitor.html">Monitor</a>
+            <a class="tab" href="connection.html">Connect</a>
+            <a class="tab active" href="samples.html">Samples</a>
+        </nav>
+    </header>
+
+    <main class="wrap layout single">
+        <section class="panel wide">
+            <div class="panel-head">
+                <h2>Dummy-data scenarios</h2>
+            </div>
+            <p class="hint">Live: Target Charge dropdown + current vs target sum in grams. Send Bay stays grey until four charges are in, then green/red on the sum. Full code+# lights bold green until the next key.</p>
+            <div class="scenario-grid">
+                <a class="scenario-card" href="index.html?scenario=ready">
+                    <h3>Ready</h3>
+                    <p>Four send charges summing to 1450 g vs B. All green. Storage present, door closed.</p>
+                </a>
+                <a class="scenario-card" href="index.html?scenario=partial">
+                    <h3>Partial send</h3>
+                    <p>Two send slots in (250 g ID07 / 500 g ID02). Charges stay grey. Entry “12” green.</p>
+                </a>
+                <a class="scenario-card" href="index.html?scenario=mismatch">
+                    <h3>Window 12123</h3>
+                    <p>Last 123 green, leading 12 yellow — suffix/prefix match.</p>
+                </a>
+                <a class="scenario-card" href="index.html?scenario=empty">
+                    <h3>Empty</h3>
+                    <p>No send charges, storage missing (one sensor → all four gone).</p>
+                </a>
+                <a class="scenario-card" href="index.html?scenario=no-pressure">
+                    <h3>Storage missing</h3>
+                    <p>Send bay full, storage bay empty.</p>
+                </a>
+                <a class="scenario-card" href="index.html?scenario=door-open">
+                    <h3>Door open</h3>
+                    <p>Cabinet box with the door swung left, empty interior. Also: Quick Actions → Door Open.</p>
+                </a>
+                <a class="scenario-card" href="index.html?scenario=io">
+                    <h3>Basic I/O</h3>
+                    <p>No target dropdown. Keys still shown, no green/yellow match.</p>
+                </a>
+                <a class="scenario-card" href="index.html?scenario=mqtt">
+                    <h3>MQTT target</h3>
+                    <p>Current game code from MQTT in the dropdown.</p>
+                </a>
+                <a class="scenario-card" href="index.html?scenario=pulse">
+                    <h3>Maglock pulse</h3>
+                    <p>Open Cabinet coil HIGH, self-timeout pending.</p>
+                </a>
+                <a class="scenario-card" href="index.html?scenario=send">
+                    <h3>Wrong send sum</h3>
+                    <p>15 / 7 / 11 / 13 = 1340 g vs B’s 1450 g — all four red once the bay is full.</p>
+                </a>
+                <a class="scenario-card" href="config.html">
+                    <h3>Config</h3>
+                    <p>Game mode, eight codes A–H, and target gram sums (with solution counts).</p>
+                </a>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PX-Dynamite-V1 Config</title>
+    <link rel="stylesheet" href="styles.css?v=dyn7">
+</head>
+<body>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <header class="topbar wrap">
+        <div class="brand">
+            <img src="assets/logo.png" alt="Logo" class="brand-logo" loading="lazy" decoding="async" onerror="this.style.display='none'">
+            <div>
+                <p class="kicker">Paradox Prop Console</p>
+                <h1>Configuration</h1>
+            </div>
+        </div>
+        <nav class="tabs">
+            <a class="tab" href="index.html">Live</a>
+            <a class="tab active" href="config.html">Config</a>
+            <a class="tab" href="monitor.html">Monitor</a>
+            <a class="tab" href="connection.html">Connect</a>
+            <div class="status-icons" id="statusIcons"></div>
+        </nav>
+    </header>
+
+    <main class="wrap layout single">
+        <section class="panel wide">
+            <div class="panel-head">
+                <h2>Runtime Config</h2>
+                <div class="row-actions">
+                    <button id="applyConfig" class="btn">Apply</button>
+                    <button id="saveConfig" class="btn btn-warn">Apply + Save</button>
+                    <button id="restoreDefaults" class="btn btn-ghost">Restore Defaults</button>
+                </div>
+            </div>
+            <form id="configForm" class="form-grid">
+                <label>Game mode
+                    <select name="gameMode" id="gameMode">
+                        <option value="io">Basic I/O — MQTT only</option>
+                        <option value="code_entry">Code Entry — match a target code</option>
+                    </select>
+                </label>
+                <label>Keypad scan (ms)
+                    <input name="keypadScanMs" type="number" min="1" max="50" step="1">
+                </label>
+                <label>Keypad debounce
+                    <input name="keypadDebounce" type="number" min="1" max="20">
+                </label>
+                <label>Reed debounce (ms)
+                    <input name="reedDebounceMs" type="number" min="5" max="200" step="5">
+                </label>
+                <label>Maglock pulse (ms)
+                    <input name="maglockPulseMs" type="number" min="50" max="400" step="10">
+                </label>
+                <label>Heartbeat (ms)
+                    <input name="heartbeatInterval" type="number" min="100" step="100">
+                </label>
+                <label class="toggle-field">Debug telemetry on Monitor
+                    <span class="toggle-row">
+                        <input name="debug" type="checkbox">
+                        <span>Show extra dumps (HTTP only)</span>
+                    </span>
+                </label>
+            </form>
+            <p class="hint">Maglock pulse is hard-capped at 400 ms. Keypad codes A–H are independent of the target gram sums. MQTT <code>{"targetCode":"A7D36#","targetWeight":1450}</code> can override the current game without saving over A–H.</p>
+            <h3 class="subhead">Target weights</h3>
+            <p class="hint">Gram sums only — order and which same-weight charge (ID05 vs ID07) do not matter. A non-empty sum with no 4-charge combination is rejected (red field). Valid sums show how many unordered 4-charge subsets hit that weight.</p>
+            <div class="weight-sets" id="weightSets"></div>
+            <h3 class="subhead">Code Entry targets</h3>
+            <p class="hint">Safe / keypad codes only. Blank codes still appear in the Live dropdown. Apply + Save stores them (demo: localStorage).</p>
+            <div class="target-sets" id="codeSets"></div>
+            <h3 class="subhead">Charge weights</h3>
+            <p class="hint">Reed-decoded IDs 1–15, in grams. Changing a weight recalculates which target sums are possible. ID05 and ID07 both default to 250 g, and those two charges count as distinct solutions.</p>
+            <div class="charge-weight-grid" id="chargeWeights"></div>
+            <pre id="configLog" class="log"></pre>
+        </section>
+
+        <section class="panel wide">
+            <div class="panel-head">
+                <h2>Raw JSON Command</h2>
+                <button id="sendRaw" class="btn">Send</button>
+            </div>
+            <textarea id="rawCommand" rows="4">{"targetCode":"123456#"}</textarea>
+            <p class="hint">POST /api/command — CF <code>{"magLock":1}</code>, <code>{"keypress":"A"}</code>, or <code>{"targetCode":"…"}</code> / <code>{"targetWeight":1450}</code> for the current game.</p>
+            <pre id="rawLog" class="log"></pre>
+        </section>
+    </main>
+
+    <script src="app.js?v=dyn7"></script>
+    <script>
+        (function boot(attempt) {
+            if (window.PX && typeof window.PX.pageConfig === "function") {
+                window.PX.pageConfig();
+                return;
+            }
+            if (attempt >= 6) {
+                var log = document.getElementById("configLog");
+                if (log) log.textContent = "Failed to load app.js after retries. Hard-refresh the page.";
+                return;
+            }
+            var s = document.createElement("script");
+            s.src = "app.js?r=" + Date.now() + "-" + attempt;
+            s.onload = function () { boot(attempt + 1); };
+            s.onerror = function () { setTimeout(function () { boot(attempt + 1); }, 200 * (attempt + 1)); };
+            document.head.appendChild(s);
+        })(0);
+    </script>
+</body>
+</html>
