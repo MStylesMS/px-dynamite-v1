@@ -4,6 +4,16 @@ All notable changes to px-dynamite-v1 are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Version numbers correspond to the contents of `version.txt`.
 
+## [Unreleased]
+
+## [0.07] - 2026-09-07
+
+### Added
+
+- GM overrides: `solveCode` (correct code path; keypresses + audio event only
+  the first time after reset), `openCabinet` (maglock pulse), `sendCharges`
+  (`*` only after code solved). Live buttons + `reset` clears the latch.
+
 ## [0.06] - 2026-09-04
 
 ### Fixed

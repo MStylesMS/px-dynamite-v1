@@ -4,10 +4,12 @@ TFD control-room dynamite cabinet firmware for Paradox escape rooms.
 
 ## Status
 
-Firmware **0.06** on the live cabinet replacement at **`192.168.8.57`**
-(`MAC 24:0a:c4:c1:25:00`, mDNS **`dynamite.local`**). I/O only: reeds,
-pressure, keypad, maglock pulse, door. Win stays in `control.js`.
-Live keypad clicks POST `{keypress}` so they match a physical press.
+Firmware **0.07** on the live cabinet replacement at **`192.168.8.57`**
+(`MAC 24:0a:c4:c1:25:00`, mDNS **`dynamite.local`**). Reeds / pressure /
+keypad / maglock pulse / door. Safe-code **matching for win** stays in
+`control.js`; GM overrides on the prop: `solveCode`, `openCabinet`,
+`sendCharges` (Live buttons). Live keypad clicks POST `{keypress}` so they
+match a physical press.
 
 The old Arduino ParadoxProp unit (**`.53`**, `24:0a:c4:1d:35:cc`) is retired /
 offline — do not treat `.57` as a spare. `.57` is the production board on
@@ -23,8 +25,9 @@ offline — do not treat `.57` as a spare. `.57` is the production board on
   `.\scripts\ota_upload.ps1 -HostAddress <ip> -Legacy` (old ParadoxProp `POST /ota`).
 - SoftAP SSID form: `Paradox-PXDynamiteV1-XXXX`.
 - Default mDNS hostname: **`dynamite.local`** (`networkName` in Connect / NVS).
-- **I/O only.** Do not put safe codes or `success()` on the ESP.
 - Maglock GPIO 23 is a **short self-timed pulse** (default 250 ms, hard cap 400 ms).
+- GM: `solveCode` (keypresses + audio event once/reset), `openCabinet`,
+  `sendCharges` (`*` only after code solved). Does not hold the maglock coil.
 
 Local UI preview without flash:
 

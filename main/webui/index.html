@@ -96,10 +96,13 @@
             </div>
             <div class="status-pills" id="statusPills"></div>
             <div class="btn-grid">
-                <button class="btn btn-start" data-cmd='{"magLock":1}'>Open Cabinet</button>
+                <button class="btn btn-start" data-cmd='{"command":"solveCode"}'>Solve code</button>
+                <button class="btn btn-start" data-cmd='{"command":"openCabinet"}'>Open Cabinet</button>
+                <button class="btn" data-cmd='{"command":"sendCharges"}'>Send</button>
                 <button class="btn" data-cmd='{"command":"reportState"}'>Report State</button>
+                <button class="btn btn-warn" data-cmd='{"command":"reset"}'>Reset</button>
             </div>
-            <p class="hint">Open Cabinet pulses the maglock for the configured pulse time (hard-capped at 400 ms) and never holds the coil. Report State publishes <code>id0..id3</code>.</p>
+            <p class="hint">Solve code acts as the target safe code (keypresses + audio event once per reset). Open Cabinet pulses the maglock only. Send publishes <code>*</code> only after the code is solved (Win/Fail map here). Pulse hard-capped at 400 ms.</p>
             <pre id="actionLog" class="log"></pre>
         </section>
     </main>

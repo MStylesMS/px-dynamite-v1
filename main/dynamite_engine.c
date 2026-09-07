@@ -89,6 +89,8 @@ typedef struct {
     int virtual_key_idx;
     int64_t virtual_key_until_ms;
     bool spi_ok;
+    bool code_solved;
+    bool code_solved_audio_played;
     char mqtt_last_in[96];
     int64_t mqtt_last_in_ts_ms;
     char mqtt_last_out[192];
@@ -105,6 +107,8 @@ typedef struct {
 } dyn_ctx_t;
 
 static dyn_ctx_t s_ctx;
+
+static const char *target_code_unlocked(void);
 
 static int64_t now_ms(void)
 {
@@ -345,6 +349,14 @@ static void append_entry_unlocked(const char *key)
     }
     s_ctx.entry_window[len] = key[0];
     s_ctx.entry_window[len + 1] = '\0';
+    {
+        const char *code = target_code_unlocked();
+        size_t n = code ? strlen(code) : 0;
+        size_t elen = strlen(s_ctx.entry_window);
+        if (n > 0 && elen >= n && strncmp(s_ctx.entry_window + (elen - n), code, n) == 0) {
+            s_ctx.code_solved = true;
+        }
+    }
 }
 
 static int key_index_for(const char *key)
@@ -749,6 +761,90 @@ static int target_grams_unlocked(void)
     return 0;
 }
 
+static const char *target_code_unlocked(void)
+{
+    int i;
+    for (i = 0; i < CODE_SET_COUNT; ++i) {
+        if (s_ctx.cfg.codes[i].label[0] &&
+            s_ctx.cfg.codes[i].label[0] == s_ctx.cfg.game_setting[0] &&
+            s_ctx.cfg.codes[i].code[0]) {
+            return s_ctx.cfg.codes[i].code;
+        }
+    }
+    for (i = 0; i < CODE_SET_COUNT; ++i) {
+        if (s_ctx.cfg.codes[i].code[0]) {
+            return s_ctx.cfg.codes[i].code;
+        }
+    }
+    return "A7D36#";
+}
+
+static void gm_publish_code_keys_unlocked(const char *code)
+{
+    char key[2] = {0};
+    if (!code) {
+        return;
+    }
+    for (; *code; ++code) {
+        key[0] = *code;
+        if (key[0] >= 'a' && key[0] <= 'd') {
+            key[0] = (char)(key[0] - 'a' + 'A');
+        }
+        if ((key[0] >= '0' && key[0] <= '9') || (key[0] >= 'A' && key[0] <= 'D') ||
+            key[0] == '*' || key[0] == '#') {
+            append_entry_unlocked(key);
+            publish_keypress_unlocked(key);
+            copy_bounded(s_ctx.last_key, sizeof(s_ctx.last_key), key);
+        }
+    }
+}
+
+static void gm_solve_code_unlocked(char *response, size_t response_size)
+{
+    const char *code = target_code_unlocked();
+    bool first = !s_ctx.code_solved;
+
+    s_ctx.code_solved = true;
+    s_ctx.entry_window[0] = '\0';
+
+    if (first) {
+        gm_publish_code_keys_unlocked(code);
+        s_ctx.code_solved_audio_played = true;
+        queue_event_unlocked("{\"event\":\"codeSolved\",\"audio\":true}");
+        record_mqtt_out_unlocked("{\"event\":\"codeSolved\",\"audio\":true}");
+        snprintf(response, response_size,
+                 "{\"ok\":true,\"Command\":\"solveCode\",\"codeSolved\":true,\"audio\":true}");
+    } else {
+        copy_bounded(s_ctx.entry_window, sizeof(s_ctx.entry_window), code);
+        queue_event_unlocked("{\"event\":\"codeSolved\",\"audio\":false}");
+        record_mqtt_out_unlocked("{\"event\":\"codeSolved\",\"audio\":false}");
+        snprintf(response, response_size,
+                 "{\"ok\":true,\"Command\":\"solveCode\",\"codeSolved\":true,\"audio\":false}");
+    }
+}
+
+static void gm_send_charges_unlocked(char *response, size_t response_size)
+{
+    if (!s_ctx.code_solved) {
+        snprintf(response, response_size, "{\"ok\":false,\"error\":\"code_not_solved\"}");
+        return;
+    }
+    append_entry_unlocked("*");
+    publish_keypress_unlocked("*");
+    copy_bounded(s_ctx.last_key, sizeof(s_ctx.last_key), "*");
+    queue_event_unlocked("{\"event\":\"sendCharges\"}");
+    record_mqtt_out_unlocked("{\"event\":\"sendCharges\"}");
+    snprintf(response, response_size, "{\"ok\":true,\"Command\":\"sendCharges\",\"keypress\":\"*\"}");
+}
+
+static void gm_reset_unlocked(void)
+{
+    s_ctx.code_solved = false;
+    s_ctx.code_solved_audio_played = false;
+    s_ctx.entry_window[0] = '\0';
+    s_ctx.last_key[0] = '\0';
+}
+
 esp_err_t dynamite_engine_init(void)
 {
     int i;
@@ -872,6 +968,7 @@ void dynamite_engine_get_state_json(char *out, size_t out_size)
                       "\"pressure\":%s,\"storagePresent\":%s,\"allConnected\":%s,"
                       "\"doorOpen\":%s,\"maglock\":%d,\"lastKey\":\"%s\",\"entryWindow\":\"%s\","
                       "\"drivenRow\":%d,\"lastPulseMs\":%d,\"pulseTimeoutFired\":%s,\"spiOk\":%s,"
+                      "\"codeSolved\":%s,\"codeSolvedAudioPlayed\":%s,"
                       "\"gameMode\":\"%s\",\"gameSetting\":\"%s\",\"weightSetting\":\"%s\","
                       "\"targetWeight\":%d,\"currentWeight\":%d,\"occupiedCount\":%d,"
                       "\"weightMatch\":%s,\"wifiConnected\":%s,\"wifiSsid\":\"%s\",\"wifiRssi\":%d,"
@@ -890,6 +987,8 @@ void dynamite_engine_get_state_json(char *out, size_t out_size)
                       s_ctx.last_pulse_ms,
                       s_ctx.pulse_timeout_fired ? "true" : "false",
                       s_ctx.spi_ok ? "true" : "false",
+                      s_ctx.code_solved ? "true" : "false",
+                      s_ctx.code_solved_audio_played ? "true" : "false",
                       s_ctx.cfg.game_mode,
                       s_ctx.cfg.game_setting,
                       s_ctx.cfg.weight_setting,
@@ -1025,9 +1124,11 @@ esp_err_t dynamite_engine_handle_command_json(const char *json, char *response, 
 
     record_mqtt_in_unlocked(json);
 
-    if (maglock == 1 || strcmp(command, "unlockCabinet") == 0 || strcmp(command, "openDoor") == 0) {
+    if (maglock == 1 || strcmp(command, "unlockCabinet") == 0 ||
+        strcmp(command, "openDoor") == 0 || strcmp(command, "openCabinet") == 0) {
         maglock_pulse_unlocked();
-        snprintf(response, response_size, "{\"ok\":true,\"magLock\":1,\"pulseMs\":%d}", maglock_pulse_ms_unlocked());
+        snprintf(response, response_size, "{\"ok\":true,\"magLock\":1,\"pulseMs\":%d,\"Command\":\"openCabinet\"}",
+                 maglock_pulse_ms_unlocked());
         dyn_unlock();
         return ESP_OK;
     }
@@ -1043,8 +1144,28 @@ esp_err_t dynamite_engine_handle_command_json(const char *json, char *response, 
         dyn_unlock();
         return ESP_OK;
     }
+    if (strcmp(command, "solveCode") == 0) {
+        gm_solve_code_unlocked(response, response_size);
+        dyn_unlock();
+        return ESP_OK;
+    }
+    if (strcmp(command, "sendCharges") == 0) {
+        gm_send_charges_unlocked(response, response_size);
+        dyn_unlock();
+        return ESP_OK;
+    }
+    if (strcmp(command, "reset") == 0) {
+        gm_reset_unlocked();
+        snprintf(response, response_size, "{\"ok\":true,\"Command\":\"reset\"}");
+        dyn_unlock();
+        return ESP_OK;
+    }
     if (sanitize_keypress(keypress_raw, keypress, sizeof(keypress))) {
         apply_virtual_key_unlocked(keypress);
+        /* Physical/virtual * after a GM (or player) code solve still counts. */
+        if (keypress[0] == '*' && s_ctx.code_solved) {
+            queue_event_unlocked("{\"event\":\"sendCharges\"}");
+        }
         snprintf(response, response_size, "{\"ok\":true,\"keypress\":\"%s\"}", keypress);
         dyn_unlock();
         return ESP_OK;
