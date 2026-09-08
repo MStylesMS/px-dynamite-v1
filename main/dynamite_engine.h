@@ -17,6 +17,8 @@ typedef struct {
 } dynamite_battery_snapshot_t;
 
 esp_err_t dynamite_engine_init(void);
+/* Start the I/O loop after Wi-Fi/SoftAP so SPI work cannot block the console. */
+esp_err_t dynamite_engine_start(void);
 
 #define DYN_STATE_JSON_MAX 8192
 

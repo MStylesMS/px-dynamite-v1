@@ -1050,7 +1050,33 @@
         return badge;
     }
 
+    function ensureHwBanner() {
+        let bar = el("hwBanner");
+        if (bar) {
+            return bar;
+        }
+        bar = document.createElement("div");
+        bar.id = "hwBanner";
+        bar.className = "hw-banner hidden";
+        bar.setAttribute("role", "alert");
+        document.body.insertBefore(bar, document.body.firstChild);
+        return bar;
+    }
+
+    function renderHwBanner(details) {
+        const bar = ensureHwBanner();
+        const msg = details && (details.hwFault || details.hardwareError);
+        if (msg) {
+            bar.textContent = msg;
+            bar.classList.remove("hidden");
+        } else {
+            bar.textContent = "";
+            bar.classList.add("hidden");
+        }
+    }
+
     function renderWifiStatus(details) {
+        renderHwBanner(details);
         const badge = ensureWifiBadge();
         if (!badge) {
             return;
@@ -1072,9 +1098,12 @@
 
     async function fetchStatusIcons() {
         try {
-            renderWifiStatus(await api("/api/state"));
+            const state = await api("/api/state");
+            renderWifiStatus(state);
+            renderHwBanner(state);
         } catch {
             renderWifiStatus(null);
+            renderHwBanner(null);
         }
     }
 

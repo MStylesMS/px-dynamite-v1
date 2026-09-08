@@ -479,10 +479,48 @@ static void dyn_loop_task(void *arg)
     bool prev_all = false;
 
     (void)arg;
+    /* First SPI touch happens here, after web_ui_start(): a wedged bus can
+     * no longer keep SoftAP/STA from starting. */
+    (void)mcp23s17_init();
+    if (mcp23s17_ok() && dyn_lock()) {
+        int i;
+        s_ctx.spi_ok = true;
+        for (i = 0; i < 4; ++i) {
+            mcp23s17_pin_output(k_rows[i]);
+            mcp23s17_digital_write(k_rows[i], 1);
+            mcp23s17_pin_input_pullup(k_cols[i]);
+        }
+        mcp23s17_pin_input_pullup(PRESSURE_PIN);
+        for (i = 16; i < 32; ++i) {
+            mcp23s17_pin_input_pullup(i);
+        }
+        dyn_unlock();
+    }
     while (true) {
         if (dyn_lock()) {
             expire_maglock_unlocked();
             expire_virtual_key_unlocked();
+            if (!s_ctx.spi_ok) {
+                static int64_t last_probe_ms;
+                int64_t now = now_ms();
+                if (now - last_probe_ms >= 500 && mcp23s17_probe()) {
+                    int i;
+                    last_probe_ms = now;
+                    s_ctx.spi_ok = true;
+                    for (i = 0; i < 4; ++i) {
+                        mcp23s17_pin_output(k_rows[i]);
+                        mcp23s17_digital_write(k_rows[i], 1);
+                        mcp23s17_pin_input_pullup(k_cols[i]);
+                    }
+                    mcp23s17_pin_input_pullup(PRESSURE_PIN);
+                    for (i = 16; i < 32; ++i) {
+                        mcp23s17_pin_input_pullup(i);
+                    }
+                    ESP_LOGI(TAG, "MCP23S17 cluster appeared — cabinet I/O enabled");
+                } else if (now - last_probe_ms >= 500) {
+                    last_probe_ms = now;
+                }
+            }
             if (s_ctx.spi_ok) {
                 scan_reeds_unlocked();
                 scan_pressure_unlocked();
@@ -847,7 +885,6 @@ static void gm_reset_unlocked(void)
 
 esp_err_t dynamite_engine_init(void)
 {
-    int i;
     const esp_timer_create_args_t timer_args = {
         .callback = maglock_timer_cb,
         .name = "maglock",
@@ -881,27 +918,16 @@ esp_err_t dynamite_engine_init(void)
         return ESP_ERR_NO_MEM;
     }
 
-    if (mcp23s17_init() != ESP_OK) {
-        ESP_LOGE(TAG, "MCP23S17 init failed");
-        s_ctx.spi_ok = false;
-    } else {
-        s_ctx.spi_ok = true;
-        for (i = 0; i < 4; ++i) {
-            mcp23s17_pin_output(k_rows[i]);
-            mcp23s17_digital_write(k_rows[i], 1);
-            mcp23s17_pin_input_pullup(k_cols[i]);
-        }
-        mcp23s17_pin_input_pullup(PRESSURE_PIN);
-        for (i = 16; i < 32; ++i) {
-            mcp23s17_pin_input_pullup(i);
-        }
-        s_ctx.spi_ok = mcp23s17_ok();
-    }
+    s_ctx.spi_ok = false;
+    ESP_LOGI(TAG, "Dynamite engine initialized (I/O starts after Wi-Fi)");
+    return ESP_OK;
+}
 
+esp_err_t dynamite_engine_start(void)
+{
     if (xTaskCreate(dyn_loop_task, "dyn_loop", 4096, NULL, 5, NULL) != pdPASS) {
         return ESP_ERR_NO_MEM;
     }
-    ESP_LOGI(TAG, "Dynamite engine initialized");
     return ESP_OK;
 }
 
@@ -1057,7 +1083,15 @@ void dynamite_engine_get_state_json(char *out, size_t out_size)
             }
         }
         lib_json_escape_string(target_code, esc_target, sizeof(esc_target));
-        (void)json_append(out, out_size, pos, "],\"targetCode\":\"%s\"}", esc_target);
+        char fault[128];
+        char esc_fault[160];
+        mcp23s17_get_fault(fault, sizeof(fault));
+        lib_json_escape_string(fault, esc_fault, sizeof(esc_fault));
+        (void)json_append(out, out_size, pos,
+                          "],\"targetCode\":\"%s\",\"hwOk\":%s,\"hwFault\":\"%s\"}",
+                          esc_target,
+                          s_ctx.spi_ok ? "true" : "false",
+                          esc_fault);
     }
     dyn_unlock();
 }

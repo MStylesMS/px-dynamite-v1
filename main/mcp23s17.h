@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include "esp_err.h"
 
@@ -10,6 +11,8 @@
 
 esp_err_t mcp23s17_init(void);
 bool mcp23s17_ok(void);
+bool mcp23s17_probe(void);
+void mcp23s17_get_fault(char *out, size_t out_size);
 
 void mcp23s17_pin_output(int logical);
 void mcp23s17_digital_write(int logical, int level);

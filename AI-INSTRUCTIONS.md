@@ -4,7 +4,7 @@ TFD control-room dynamite cabinet firmware for Paradox escape rooms.
 
 ## Status
 
-Firmware **0.07** on the live cabinet replacement at **`192.168.8.57`**
+Firmware **0.08** on the live cabinet replacement at **`192.168.8.57`**
 (`MAC 24:0a:c4:c1:25:00`, mDNS **`dynamite.local`**). Reeds / pressure /
 keypad / maglock pulse / door. Safe-code **matching for win** stays in
 `control.js`; GM overrides on the prop: `solveCode`, `openCabinet`,
@@ -60,6 +60,8 @@ Pin source is [tfd-old/Archive/dynamite/dynamite/dynamite.ino](../../../rooms/tf
   planned `allConnected` gate in `control.js` later).
 - Version bump default `+0.01`.
 - Path-relative assets + `lib_http_proxy` when serving embedded UI.
+- Hardware must not block boot: `hwOk` / `hwFault` + red `.hw-banner`.
+  Shared contract: [../px-components/docs/hw-fault.md](../px-components/docs/hw-fault.md).
 
 ## Suite standards
 

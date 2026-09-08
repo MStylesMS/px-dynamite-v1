@@ -6,6 +6,24 @@ Version numbers correspond to the contents of `version.txt`.
 
 ## [Unreleased]
 
+## [0.09] - 2026-09-08
+
+### Fixed
+
+- MCP init and the I/O loop now start **after** SoftAP/STA, so a wedged SPI
+  bus cannot keep the console offline (valve 0.09 lesson).
+- SPI transfers use `spi_device_queue_trans` + `get_trans_result` with an
+  80 ms bound. IDF 6 rejects `polling_start` timeouts and `polling_transmit`
+  cannot time out.
+
+## [0.08] - 2026-09-07
+
+### Fixed
+
+- Missing MCP23S17 expanders no longer fail init or starve the scan loop.
+  Wi-Fi / SoftAP stay up; a red banner reports `hwFault` until both chips
+  answer a write/readback.
+
 ## [0.07] - 2026-09-07
 
 ### Added
